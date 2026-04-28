@@ -11,6 +11,7 @@ public class MainViewModel : INotifyPropertyChanged
 {
     private readonly BinaryFileService _fileService = new();
     private readonly BinaryCompareService _compareService = new();
+    private readonly DiffExportService _exportService = new();
 
     private byte[] _bytesA = [];
     private byte[] _bytesB = [];
@@ -31,6 +32,7 @@ public class MainViewModel : INotifyPropertyChanged
     private string _sameSizeText = "-";
     private double _progress;
     private IReadOnlyList<DiffItemViewModel> _diffItems = [];
+    private IReadOnlyList<BinaryDiffViewer.Models.BinaryDiffItem> _lastDisplayDiffItems = [];
 
     public string FileAPath
     {
@@ -108,6 +110,7 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand OpenFileBCommand { get; }
     public ICommand CompareCommand { get; }
     public ICommand CancelCommand { get; }
+    public ICommand ExportCsvCommand { get; }
 
     public MainViewModel()
     {
@@ -119,6 +122,9 @@ public class MainViewModel : INotifyPropertyChanged
         CancelCommand = new RelayCommand(
             _ => _cts?.Cancel(),
             _ => _isComparing);
+        ExportCsvCommand = new RelayCommand(
+            async _ => await ExportCsvAsync(),
+            _ => _lastDisplayDiffItems.Count > 0 && !_isComparing);
     }
 
     private void OpenFile(bool isFileA)
@@ -159,6 +165,7 @@ public class MainViewModel : INotifyPropertyChanged
         SameSizeText = "-";
         Progress = 0;
         DiffItems = [];
+        _lastDisplayDiffItems = [];
 
         try
         {
@@ -178,6 +185,7 @@ public class MainViewModel : INotifyPropertyChanged
             FileAHexContent = HexFormatter.GenerateDiffHexView(_bytesA, result.DisplayDiffItems, isFileA: true);
             FileBHexContent = HexFormatter.GenerateDiffHexView(_bytesB, result.DisplayDiffItems, isFileA: false);
 
+            _lastDisplayDiffItems = result.DisplayDiffItems;
             DiffItems = result.DisplayDiffItems
                 .Select(d => new DiffItemViewModel(d))
                 .ToList();
@@ -189,6 +197,7 @@ public class MainViewModel : INotifyPropertyChanged
             FirstDiffOffsetText = "-";
             SameSizeText = "-";
             DiffItems = [];
+            _lastDisplayDiffItems = [];
         }
         catch (Exception ex)
         {
@@ -197,6 +206,7 @@ public class MainViewModel : INotifyPropertyChanged
             FirstDiffOffsetText = "-";
             SameSizeText = "-";
             DiffItems = [];
+            _lastDisplayDiffItems = [];
         }
         finally
         {
@@ -205,6 +215,28 @@ public class MainViewModel : INotifyPropertyChanged
             _cts = null;
             _isComparing = false;
             CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    private async Task ExportCsvAsync()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "CSV出力先を選択",
+            Filter = "CSVファイル (*.csv)|*.csv|すべてのファイル (*.*)|*.*",
+            DefaultExt = "csv",
+            FileName = "diff_result.csv"
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        try
+        {
+            await _exportService.ExportToCsvAsync(dialog.FileName, _lastDisplayDiffItems);
+            CompareStatus = "CSV出力が完了しました";
+        }
+        catch (Exception ex)
+        {
+            CompareStatus = $"CSV出力エラー: {ex.Message}";
         }
     }
 
@@ -218,6 +250,7 @@ public class MainViewModel : INotifyPropertyChanged
         FileAHexContent = HexFormatter.GeneratePlainHexView(_bytesA);
         FileBHexContent = HexFormatter.GeneratePlainHexView(_bytesB);
         DiffItems = [];
+        _lastDisplayDiffItems = [];
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
