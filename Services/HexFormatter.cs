@@ -6,14 +6,14 @@ namespace BinaryDiffViewer.Services;
 public static class HexFormatter
 {
     private const int BytesPerLine = 16;
+    // Normal hex section width for a full 16-byte line: XX<sp> × 16 minus trailing space = 47
+    private const int FullHexWidth = BytesPerLine * 3 - 1;
 
     public static string GeneratePlainHexView(byte[] data)
     {
         var sb = new StringBuilder(EstimateCapacity(data.Length));
         for (int i = 0; i < data.Length; i += BytesPerLine)
-        {
             AppendLine(sb, data, i, highlightSet: null);
-        }
         return sb.ToString();
     }
 
@@ -22,25 +22,54 @@ public static class HexFormatter
         var highlightSet = BuildHighlightSet(data.Length, diffs, isFileA);
         var sb = new StringBuilder(EstimateCapacity(data.Length));
         for (int i = 0; i < data.Length; i += BytesPerLine)
-        {
             AppendLine(sb, data, i, highlightSet);
-        }
         return sb.ToString();
     }
 
+    // Format: XXXXXXXX  HH [HH] HH ...  ASCII
     private static void AppendLine(StringBuilder sb, byte[] data, int lineStart, HashSet<long>? highlightSet)
     {
-        sb.Append($"{lineStart:X8}  ");
         int lineEnd = Math.Min(lineStart + BytesPerLine, data.Length);
+
+        // Offset
+        sb.Append($"{lineStart:X8}  ");
+
+        // Hex section — track written width to pad for alignment
+        int hexWidth = 0;
         for (int j = lineStart; j < lineEnd; j++)
         {
             if (highlightSet != null && highlightSet.Contains(j))
-                sb.Append($"[{data[j]:X2}]");
-            else
+            {
+                sb.Append('[');
                 sb.Append($"{data[j]:X2}");
+                sb.Append(']');
+                hexWidth += 4;
+            }
+            else
+            {
+                sb.Append($"{data[j]:X2}");
+                hexWidth += 2;
+            }
 
-            if (j < lineEnd - 1) sb.Append(' ');
+            if (j < lineEnd - 1)
+            {
+                sb.Append(' ');
+                hexWidth++;
+            }
         }
+
+        // Pad hex section to full-line width so ASCII column stays aligned.
+        // When brackets push hexWidth past FullHexWidth, ASCII shifts right — accepted for simplified diff view.
+        if (hexWidth < FullHexWidth)
+            sb.Append(' ', FullHexWidth - hexWidth);
+
+        // Separator
+        sb.Append("  ");
+
+        // ASCII section
+        for (int j = lineStart; j < lineEnd; j++)
+            sb.Append(ToAsciiChar(data[j]));
+
         sb.AppendLine();
     }
 
@@ -59,10 +88,12 @@ public static class HexFormatter
         return set;
     }
 
+    private static char ToAsciiChar(byte b) => b >= 0x20 && b < 0x7F ? (char)b : '.';
+
     private static int EstimateCapacity(int byteCount)
     {
-        // offset(10) + bytes(16*3) + newline(2) per line
+        // offset(10) + hex(47) + separator(2) + ascii(16) + newline(2) per line
         int lines = (byteCount + BytesPerLine - 1) / BytesPerLine;
-        return lines * 60;
+        return lines * 77;
     }
 }
