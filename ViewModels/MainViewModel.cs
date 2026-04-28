@@ -10,46 +10,138 @@ namespace BinaryDiffViewer.ViewModels;
 public class MainViewModel : INotifyPropertyChanged
 {
     private readonly BinaryFileService _fileService = new();
+    private readonly BinaryCompareService _compareService = new();
 
-    private string _filePath = string.Empty;
-    private string _fileSize = string.Empty;
-    private string _hexContent = string.Empty;
+    private string _fileAPath = string.Empty;
+    private string _fileASize = string.Empty;
+    private string _fileAHexContent = string.Empty;
 
-    public string FilePath
+    private string _fileBPath = string.Empty;
+    private string _fileBSize = string.Empty;
+    private string _fileBHexContent = string.Empty;
+
+    private string _compareStatus = "未比較";
+    private string _diffCountText = "-";
+    private string _firstDiffOffsetText = "-";
+    private string _sameSizeText = "-";
+
+    public string FileAPath
     {
-        get => _filePath;
-        private set { _filePath = value; OnPropertyChanged(); }
+        get => _fileAPath;
+        private set { _fileAPath = value; OnPropertyChanged(); }
     }
 
-    public string FileSize
+    public string FileASize
     {
-        get => _fileSize;
-        private set { _fileSize = value; OnPropertyChanged(); }
+        get => _fileASize;
+        private set { _fileASize = value; OnPropertyChanged(); }
     }
 
-    public string HexContent
+    public string FileAHexContent
     {
-        get => _hexContent;
-        private set { _hexContent = value; OnPropertyChanged(); }
+        get => _fileAHexContent;
+        private set { _fileAHexContent = value; OnPropertyChanged(); }
     }
 
-    public ICommand OpenFileCommand { get; }
+    public string FileBPath
+    {
+        get => _fileBPath;
+        private set { _fileBPath = value; OnPropertyChanged(); }
+    }
+
+    public string FileBSize
+    {
+        get => _fileBSize;
+        private set { _fileBSize = value; OnPropertyChanged(); }
+    }
+
+    public string FileBHexContent
+    {
+        get => _fileBHexContent;
+        private set { _fileBHexContent = value; OnPropertyChanged(); }
+    }
+
+    public string CompareStatus
+    {
+        get => _compareStatus;
+        private set { _compareStatus = value; OnPropertyChanged(); }
+    }
+
+    public string DiffCountText
+    {
+        get => _diffCountText;
+        private set { _diffCountText = value; OnPropertyChanged(); }
+    }
+
+    public string FirstDiffOffsetText
+    {
+        get => _firstDiffOffsetText;
+        private set { _firstDiffOffsetText = value; OnPropertyChanged(); }
+    }
+
+    public string SameSizeText
+    {
+        get => _sameSizeText;
+        private set { _sameSizeText = value; OnPropertyChanged(); }
+    }
+
+    public ICommand OpenFileACommand { get; }
+    public ICommand OpenFileBCommand { get; }
+    public ICommand CompareCommand { get; }
 
     public MainViewModel()
     {
-        OpenFileCommand = new RelayCommand(_ => OpenFile());
+        OpenFileACommand = new RelayCommand(_ => OpenFile(isFileA: true));
+        OpenFileBCommand = new RelayCommand(_ => OpenFile(isFileA: false));
+        CompareCommand = new RelayCommand(
+            _ => Compare(),
+            _ => !string.IsNullOrEmpty(FileAPath) && !string.IsNullOrEmpty(FileBPath));
     }
 
-    private void OpenFile()
+    private void OpenFile(bool isFileA)
     {
-        var dialog = new OpenFileDialog { Title = "ファイルを開く" };
+        var dialog = new OpenFileDialog { Title = isFileA ? "ファイルAを開く" : "ファイルBを開く" };
         if (dialog.ShowDialog() != true) return;
 
-        FilePath = dialog.FileName;
-        var size = _fileService.GetFileSize(dialog.FileName);
-        FileSize = BinaryFileService.FormatFileSize(size);
-        var bytes = _fileService.ReadBytes(dialog.FileName);
-        HexContent = _fileService.GenerateHexView(bytes);
+        var path = dialog.FileName;
+        var sizeText = BinaryFileService.FormatFileSize(_fileService.GetFileSize(path));
+        var hexContent = _fileService.GenerateHexView(_fileService.ReadBytes(path));
+
+        if (isFileA)
+        {
+            FileAPath = path;
+            FileASize = sizeText;
+            FileAHexContent = hexContent;
+        }
+        else
+        {
+            FileBPath = path;
+            FileBSize = sizeText;
+            FileBHexContent = hexContent;
+        }
+
+        ResetCompareResult();
+        System.Windows.Input.CommandManager.InvalidateRequerySuggested();
+    }
+
+    private void Compare()
+    {
+        var result = _compareService.Compare(FileAPath, FileBPath);
+
+        CompareStatus = result.AreIdentical ? "一致" : "差分あり";
+        DiffCountText = $"{result.TotalDiffCount:N0} 件";
+        FirstDiffOffsetText = result.FirstDiffOffset.HasValue
+            ? $"0x{result.FirstDiffOffset.Value:X8}"
+            : "なし";
+        SameSizeText = result.SameSize ? "同じ" : "異なる";
+    }
+
+    private void ResetCompareResult()
+    {
+        CompareStatus = "未比較";
+        DiffCountText = "-";
+        FirstDiffOffsetText = "-";
+        SameSizeText = "-";
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
