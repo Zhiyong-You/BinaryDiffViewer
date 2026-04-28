@@ -12,6 +12,9 @@ public class MainViewModel : INotifyPropertyChanged
     private readonly BinaryFileService _fileService = new();
     private readonly BinaryCompareService _compareService = new();
 
+    private byte[] _bytesA = [];
+    private byte[] _bytesB = [];
+
     private string _fileAPath = string.Empty;
     private string _fileASize = string.Empty;
     private string _fileAHexContent = string.Empty;
@@ -105,19 +108,19 @@ public class MainViewModel : INotifyPropertyChanged
 
         var path = dialog.FileName;
         var sizeText = BinaryFileService.FormatFileSize(_fileService.GetFileSize(path));
-        var hexContent = _fileService.GenerateHexView(_fileService.ReadBytes(path));
+        var bytes = _fileService.ReadBytes(path);
 
         if (isFileA)
         {
+            _bytesA = bytes;
             FileAPath = path;
             FileASize = sizeText;
-            FileAHexContent = hexContent;
         }
         else
         {
+            _bytesB = bytes;
             FileBPath = path;
             FileBSize = sizeText;
-            FileBHexContent = hexContent;
         }
 
         ResetCompareResult();
@@ -134,6 +137,9 @@ public class MainViewModel : INotifyPropertyChanged
             ? $"0x{result.FirstDiffOffset.Value:X8}"
             : "なし";
         SameSizeText = result.SameSize ? "同じ" : "異なる";
+
+        FileAHexContent = HexFormatter.GenerateDiffHexView(_bytesA, result.Diffs, isFileA: true);
+        FileBHexContent = HexFormatter.GenerateDiffHexView(_bytesB, result.Diffs, isFileA: false);
     }
 
     private void ResetCompareResult()
@@ -142,6 +148,8 @@ public class MainViewModel : INotifyPropertyChanged
         DiffCountText = "-";
         FirstDiffOffsetText = "-";
         SameSizeText = "-";
+        FileAHexContent = HexFormatter.GeneratePlainHexView(_bytesA);
+        FileBHexContent = HexFormatter.GeneratePlainHexView(_bytesB);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

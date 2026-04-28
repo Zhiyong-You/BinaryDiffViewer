@@ -1,12 +1,10 @@
 using System.IO;
-using System.Text;
 
 namespace BinaryDiffViewer.Services;
 
 public class BinaryFileService
 {
     private const int MaxReadBytes = 1024 * 1024; // 1MB
-    private const int BytesPerLine = 16;
 
     public byte[] ReadBytes(string filePath)
     {
@@ -25,22 +23,7 @@ public class BinaryFileService
 
     public long GetFileSize(string filePath) => new FileInfo(filePath).Length;
 
-    public string GenerateHexView(byte[] data)
-    {
-        var sb = new StringBuilder();
-        for (int i = 0; i < data.Length; i += BytesPerLine)
-        {
-            sb.Append($"{i:X8}  ");
-            int lineEnd = Math.Min(i + BytesPerLine, data.Length);
-            for (int j = i; j < lineEnd; j++)
-            {
-                sb.Append($"{data[j]:X2}");
-                if (j < lineEnd - 1) sb.Append(' ');
-            }
-            sb.AppendLine();
-        }
-        return sb.ToString();
-    }
+    public string GenerateHexView(byte[] data) => HexFormatter.GeneratePlainHexView(data);
 
     public static string FormatFileSize(long bytes)
     {
