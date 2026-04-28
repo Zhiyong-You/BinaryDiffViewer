@@ -5,57 +5,99 @@ namespace BinaryDiffViewer.Services;
 
 public class BinaryCompareService
 {
-    private const int MaxCompareBytes = 10 * 1024 * 1024; // 10MB
+    private const int BlockSize = 65536;       // 64KB per block
+    private const int MaxDisplayDiffs = 10_000;
 
-    public BinaryDiffResult Compare(string filePathA, string filePathB)
+    public async Task<BinaryDiffResult> CompareAsync(
+        string filePathA,
+        string filePathB,
+        IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
     {
-        var bytesA = ReadBytes(filePathA);
-        var bytesB = ReadBytes(filePathB);
-        var sameSize = new FileInfo(filePathA).Length == new FileInfo(filePathB).Length;
+        var sizeA = new FileInfo(filePathA).Length;
+        var sizeB = new FileInfo(filePathB).Length;
+        var totalBytes = Math.Max(sizeA, sizeB);
 
-        var diffs = new List<BinaryDiffItem>();
-        var maxLen = Math.Max(bytesA.Length, bytesB.Length);
+        var displayDiffs = new List<BinaryDiffItem>(Math.Min(MaxDisplayDiffs, 1024));
+        long totalDiffCount = 0;
+        long? firstDiffOffset = null;
+        long globalOffset = 0;
 
-        for (var i = 0; i < maxLen; i++)
+        var bufferA = new byte[BlockSize];
+        var bufferB = new byte[BlockSize];
+
+        await using var streamA = new FileStream(
+            filePathA, FileMode.Open, FileAccess.Read, FileShare.Read,
+            BlockSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        await using var streamB = new FileStream(
+            filePathB, FileMode.Open, FileAccess.Read, FileShare.Read,
+            BlockSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
+
+        while (true)
         {
-            var inA = i < bytesA.Length;
-            var inB = i < bytesB.Length;
+            cancellationToken.ThrowIfCancellationRequested();
 
-            if (inA && inB)
+            var readA = await ReadBlockAsync(streamA, bufferA, cancellationToken).ConfigureAwait(false);
+            var readB = await ReadBlockAsync(streamB, bufferB, cancellationToken).ConfigureAwait(false);
+
+            if (readA == 0 && readB == 0) break;
+
+            var maxRead = Math.Max(readA, readB);
+            for (int i = 0; i < maxRead; i++)
             {
-                if (bytesA[i] != bytesB[i])
-                    diffs.Add(new BinaryDiffItem(i, DiffType.Modified, bytesA[i], bytesB[i]));
+                var inA = i < readA;
+                var inB = i < readB;
+
+                BinaryDiffItem? diff = null;
+                if (inA && inB)
+                {
+                    if (bufferA[i] != bufferB[i])
+                        diff = new BinaryDiffItem(globalOffset + i, DiffType.Modified, bufferA[i], bufferB[i]);
+                }
+                else if (inA)
+                {
+                    diff = new BinaryDiffItem(globalOffset + i, DiffType.Removed, bufferA[i], null);
+                }
+                else
+                {
+                    diff = new BinaryDiffItem(globalOffset + i, DiffType.Added, null, bufferB[i]);
+                }
+
+                if (diff is not null)
+                {
+                    totalDiffCount++;
+                    firstDiffOffset ??= diff.Offset;
+                    if (displayDiffs.Count < MaxDisplayDiffs)
+                        displayDiffs.Add(diff);
+                }
             }
-            else if (inA)
-            {
-                diffs.Add(new BinaryDiffItem(i, DiffType.Removed, bytesA[i], null));
-            }
-            else
-            {
-                diffs.Add(new BinaryDiffItem(i, DiffType.Added, null, bytesB[i]));
-            }
+
+            globalOffset += maxRead;
+
+            if (totalBytes > 0)
+                progress?.Report((double)globalOffset / totalBytes * 100.0);
         }
 
         return new BinaryDiffResult(
-            SameSize: sameSize,
-            TotalDiffCount: diffs.Count,
-            FirstDiffOffset: diffs.Count > 0 ? diffs[0].Offset : null,
-            Diffs: diffs.AsReadOnly()
+            IsSameSize: sizeA == sizeB,
+            TotalDiffCount: totalDiffCount,
+            FirstDiffOffset: firstDiffOffset,
+            FileASize: sizeA,
+            FileBSize: sizeB,
+            DisplayDiffItems: displayDiffs.AsReadOnly()
         );
     }
 
-    private static byte[] ReadBytes(string filePath)
+    private static async ValueTask<int> ReadBlockAsync(
+        FileStream stream, byte[] buffer, CancellationToken cancellationToken)
     {
-        using var stream = File.OpenRead(filePath);
-        var bytesToRead = (int)Math.Min(stream.Length, MaxCompareBytes);
-        var buffer = new byte[bytesToRead];
         var totalRead = 0;
-        while (totalRead < bytesToRead)
+        while (totalRead < buffer.Length)
         {
-            var read = stream.Read(buffer, totalRead, bytesToRead - totalRead);
+            var read = await stream.ReadAsync(buffer.AsMemory(totalRead), cancellationToken).ConfigureAwait(false);
             if (read == 0) break;
             totalRead += read;
         }
-        return buffer;
+        return totalRead;
     }
 }

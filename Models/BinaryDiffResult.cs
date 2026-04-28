@@ -1,10 +1,12 @@
 namespace BinaryDiffViewer.Models;
 
 public record BinaryDiffResult(
-    bool SameSize,
+    bool IsSameSize,
     long TotalDiffCount,
     long? FirstDiffOffset,
-    IReadOnlyList<BinaryDiffItem> Diffs
+    long FileASize,
+    long FileBSize,
+    IReadOnlyList<BinaryDiffItem> DisplayDiffItems
 )
 {
     public bool AreIdentical => TotalDiffCount == 0;

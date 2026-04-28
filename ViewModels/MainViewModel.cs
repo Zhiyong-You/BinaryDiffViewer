@@ -14,6 +14,8 @@ public class MainViewModel : INotifyPropertyChanged
 
     private byte[] _bytesA = [];
     private byte[] _bytesB = [];
+    private bool _isComparing;
+    private CancellationTokenSource? _cts;
 
     private string _fileAPath = string.Empty;
     private string _fileASize = string.Empty;
@@ -27,6 +29,8 @@ public class MainViewModel : INotifyPropertyChanged
     private string _diffCountText = "-";
     private string _firstDiffOffsetText = "-";
     private string _sameSizeText = "-";
+    private double _progress;
+    private IReadOnlyList<DiffItemViewModel> _diffItems = [];
 
     public string FileAPath
     {
@@ -88,17 +92,33 @@ public class MainViewModel : INotifyPropertyChanged
         private set { _sameSizeText = value; OnPropertyChanged(); }
     }
 
+    public double Progress
+    {
+        get => _progress;
+        private set { _progress = value; OnPropertyChanged(); }
+    }
+
+    public IReadOnlyList<DiffItemViewModel> DiffItems
+    {
+        get => _diffItems;
+        private set { _diffItems = value; OnPropertyChanged(); }
+    }
+
     public ICommand OpenFileACommand { get; }
     public ICommand OpenFileBCommand { get; }
     public ICommand CompareCommand { get; }
+    public ICommand CancelCommand { get; }
 
     public MainViewModel()
     {
         OpenFileACommand = new RelayCommand(_ => OpenFile(isFileA: true));
         OpenFileBCommand = new RelayCommand(_ => OpenFile(isFileA: false));
         CompareCommand = new RelayCommand(
-            _ => Compare(),
-            _ => !string.IsNullOrEmpty(FileAPath) && !string.IsNullOrEmpty(FileBPath));
+            async _ => await CompareAsync(),
+            _ => !string.IsNullOrEmpty(FileAPath) && !string.IsNullOrEmpty(FileBPath) && !_isComparing);
+        CancelCommand = new RelayCommand(
+            _ => _cts?.Cancel(),
+            _ => _isComparing);
     }
 
     private void OpenFile(bool isFileA)
@@ -124,22 +144,68 @@ public class MainViewModel : INotifyPropertyChanged
         }
 
         ResetCompareResult();
-        System.Windows.Input.CommandManager.InvalidateRequerySuggested();
+        CommandManager.InvalidateRequerySuggested();
     }
 
-    private void Compare()
+    private async Task CompareAsync()
     {
-        var result = _compareService.Compare(FileAPath, FileBPath);
+        _isComparing = true;
+        _cts = new CancellationTokenSource();
+        CommandManager.InvalidateRequerySuggested();
 
-        CompareStatus = result.AreIdentical ? "一致" : "差分あり";
-        DiffCountText = $"{result.TotalDiffCount:N0} 件";
-        FirstDiffOffsetText = result.FirstDiffOffset.HasValue
-            ? $"0x{result.FirstDiffOffset.Value:X8}"
-            : "なし";
-        SameSizeText = result.SameSize ? "同じ" : "異なる";
+        CompareStatus = "比較中...";
+        DiffCountText = "-";
+        FirstDiffOffsetText = "-";
+        SameSizeText = "-";
+        Progress = 0;
+        DiffItems = [];
 
-        FileAHexContent = HexFormatter.GenerateDiffHexView(_bytesA, result.Diffs, isFileA: true);
-        FileBHexContent = HexFormatter.GenerateDiffHexView(_bytesB, result.Diffs, isFileA: false);
+        try
+        {
+            var progress = new Progress<double>(p => Progress = p);
+            var result = await _compareService.CompareAsync(
+                FileAPath, FileBPath, progress, _cts.Token);
+
+            CompareStatus = result.AreIdentical
+                ? "2つのファイルは完全に一致しています"
+                : "差分あり";
+            DiffCountText = $"{result.TotalDiffCount:N0} 件";
+            FirstDiffOffsetText = result.FirstDiffOffset.HasValue
+                ? $"0x{result.FirstDiffOffset.Value:X8}"
+                : "なし";
+            SameSizeText = result.IsSameSize ? "同じ" : "異なる";
+
+            FileAHexContent = HexFormatter.GenerateDiffHexView(_bytesA, result.DisplayDiffItems, isFileA: true);
+            FileBHexContent = HexFormatter.GenerateDiffHexView(_bytesB, result.DisplayDiffItems, isFileA: false);
+
+            DiffItems = result.DisplayDiffItems
+                .Select(d => new DiffItemViewModel(d))
+                .ToList();
+        }
+        catch (OperationCanceledException)
+        {
+            CompareStatus = "比較をキャンセルしました";
+            DiffCountText = "-";
+            FirstDiffOffsetText = "-";
+            SameSizeText = "-";
+            DiffItems = [];
+        }
+        catch (Exception ex)
+        {
+            CompareStatus = $"エラー: {ex.Message}";
+            DiffCountText = "-";
+            FirstDiffOffsetText = "-";
+            SameSizeText = "-";
+            DiffItems = [];
+        }
+        finally
+        {
+            Progress = 0;
+            _cts?.Dispose();
+            _cts = null;
+            _isComparing = false;
+            CommandManager.InvalidateRequerySuggested();
+        }
     }
 
     private void ResetCompareResult()
@@ -148,8 +214,10 @@ public class MainViewModel : INotifyPropertyChanged
         DiffCountText = "-";
         FirstDiffOffsetText = "-";
         SameSizeText = "-";
+        Progress = 0;
         FileAHexContent = HexFormatter.GeneratePlainHexView(_bytesA);
         FileBHexContent = HexFormatter.GeneratePlainHexView(_bytesB);
+        DiffItems = [];
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
