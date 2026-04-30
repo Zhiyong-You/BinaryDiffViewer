@@ -9,6 +9,10 @@ namespace BinaryDiffViewer.ViewModels;
 
 public class MainViewModel : INotifyPropertyChanged
 {
+    private const int BytesPerHexLine = 16;
+    private const int FocusedHexViewLineCount = 256;
+    private const int FocusedHexViewByteCount = FocusedHexViewLineCount * BytesPerHexLine;
+
     private readonly BinaryFileService _fileService = new();
     private readonly BinaryCompareService _compareService = new();
     private readonly DiffExportService _exportService = new();
@@ -30,6 +34,7 @@ public class MainViewModel : INotifyPropertyChanged
     private string _diffCountText = "-";
     private string _firstDiffOffsetText = "-";
     private string _sameSizeText = "-";
+    private string _selectedDiffOffsetText = "-";
     private double _progress;
     private IReadOnlyList<DiffItemViewModel> _diffItems = [];
     private IReadOnlyList<BinaryDiffViewer.Models.BinaryDiffItem> _lastDisplayDiffItems = [];
@@ -92,6 +97,12 @@ public class MainViewModel : INotifyPropertyChanged
     {
         get => _sameSizeText;
         private set { _sameSizeText = value; OnPropertyChanged(); }
+    }
+
+    public string SelectedDiffOffsetText
+    {
+        get => _selectedDiffOffsetText;
+        private set { _selectedDiffOffsetText = value; OnPropertyChanged(); }
     }
 
     public double Progress
@@ -163,6 +174,7 @@ public class MainViewModel : INotifyPropertyChanged
         DiffCountText = "-";
         FirstDiffOffsetText = "-";
         SameSizeText = "-";
+        SelectedDiffOffsetText = "-";
         Progress = 0;
         DiffItems = [];
         _lastDisplayDiffItems = [];
@@ -196,6 +208,7 @@ public class MainViewModel : INotifyPropertyChanged
             DiffCountText = "-";
             FirstDiffOffsetText = "-";
             SameSizeText = "-";
+            SelectedDiffOffsetText = "-";
             DiffItems = [];
             _lastDisplayDiffItems = [];
         }
@@ -205,6 +218,7 @@ public class MainViewModel : INotifyPropertyChanged
             DiffCountText = "-";
             FirstDiffOffsetText = "-";
             SameSizeText = "-";
+            SelectedDiffOffsetText = "-";
             DiffItems = [];
             _lastDisplayDiffItems = [];
         }
@@ -246,11 +260,42 @@ public class MainViewModel : INotifyPropertyChanged
         DiffCountText = "-";
         FirstDiffOffsetText = "-";
         SameSizeText = "-";
+        SelectedDiffOffsetText = "-";
         Progress = 0;
         FileAHexContent = HexFormatter.GeneratePlainHexView(_bytesA);
         FileBHexContent = HexFormatter.GeneratePlainHexView(_bytesB);
         DiffItems = [];
         _lastDisplayDiffItems = [];
+    }
+
+    public void SetSelectedDiffOffset(long? offset)
+    {
+        SelectedDiffOffsetText = offset.HasValue
+            ? $"0x{offset.Value:X8}"
+            : "-";
+    }
+
+    public int FocusHexViewOnOffset(long offset)
+    {
+        SetSelectedDiffOffset(offset);
+
+        if (string.IsNullOrEmpty(FileAPath) || string.IsNullOrEmpty(FileBPath))
+            return 0;
+
+        var selectedLineIndex = offset / BytesPerHexLine;
+        var startLineIndex = Math.Max(selectedLineIndex - (FocusedHexViewLineCount / 2), 0);
+        var startOffset = startLineIndex * BytesPerHexLine;
+
+        FileAHexContent = BuildFocusedHexView(FileAPath, startOffset, isFileA: true);
+        FileBHexContent = BuildFocusedHexView(FileBPath, startOffset, isFileA: false);
+
+        return (int)(selectedLineIndex - startLineIndex);
+    }
+
+    private string BuildFocusedHexView(string filePath, long startOffset, bool isFileA)
+    {
+        var bytes = _fileService.ReadBytes(filePath, startOffset, FocusedHexViewByteCount);
+        return HexFormatter.GenerateDiffHexView(bytes, _lastDisplayDiffItems, isFileA, startOffset);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

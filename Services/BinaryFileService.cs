@@ -7,9 +7,22 @@ public class BinaryFileService
     private const int MaxReadBytes = 1024 * 1024; // 1MB
 
     public byte[] ReadBytes(string filePath)
+        => ReadBytes(filePath, 0, MaxReadBytes);
+
+    public byte[] ReadBytes(string filePath, long startOffset, int maxBytes)
     {
         using var stream = File.OpenRead(filePath);
-        var bytesToRead = (int)Math.Min(stream.Length, MaxReadBytes);
+
+        if (stream.Length == 0 || maxBytes <= 0)
+            return [];
+
+        var clampedStartOffset = Math.Max(startOffset, 0);
+        if (clampedStartOffset >= stream.Length)
+            return [];
+
+        stream.Seek(clampedStartOffset, SeekOrigin.Begin);
+
+        var bytesToRead = (int)Math.Min(stream.Length - clampedStartOffset, maxBytes);
         var buffer = new byte[bytesToRead];
         var totalRead = 0;
         while (totalRead < bytesToRead)

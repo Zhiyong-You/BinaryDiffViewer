@@ -4,6 +4,7 @@ namespace BinaryDiffViewer.ViewModels;
 
 public class DiffItemViewModel
 {
+    public long OffsetValue { get; }
     public string Offset { get; }
     public string FileAByte { get; }
     public string FileBByte { get; }
@@ -11,6 +12,7 @@ public class DiffItemViewModel
 
     public DiffItemViewModel(BinaryDiffItem item)
     {
+        OffsetValue = item.Offset;
         Offset = $"0x{item.Offset:X8}";
         FileAByte = item.ByteA.HasValue ? $"{item.ByteA.Value:X2}" : string.Empty;
         FileBByte = item.ByteB.HasValue ? $"{item.ByteB.Value:X2}" : string.Empty;

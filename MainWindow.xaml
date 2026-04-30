@@ -66,12 +66,16 @@
                     <TextBlock Text="{Binding FirstDiffOffsetText}" VerticalAlignment="Center"
                                Foreground="#CE9178" FontFamily="Consolas" Margin="4,0,20,0" />
 
-                    <TextBlock Text="ファイルサイズ：" VerticalAlignment="Center" Foreground="#AAAAAA" />
-                    <TextBlock Text="{Binding SameSizeText}" VerticalAlignment="Center"
-                               Foreground="#CE9178" Margin="4,0,0,0" />
-                </StackPanel>
-            </Grid>
-        </Border>
+                     <TextBlock Text="ファイルサイズ：" VerticalAlignment="Center" Foreground="#AAAAAA" />
+                     <TextBlock Text="{Binding SameSizeText}" VerticalAlignment="Center"
+                                Foreground="#CE9178" Margin="4,0,20,0" />
+
+                     <TextBlock Text="選択中の差分：" VerticalAlignment="Center" Foreground="#AAAAAA" />
+                     <TextBlock Text="{Binding SelectedDiffOffsetText}" VerticalAlignment="Center"
+                                Foreground="#CE9178" FontFamily="Consolas" Margin="4,0,0,0" />
+                 </StackPanel>
+             </Grid>
+         </Border>
 
         <!-- 16進数表示エリア（左右分割） -->
         <Grid Grid.Row="1">
@@ -103,11 +107,12 @@
                     <TextBlock Grid.Column="3" Text="{Binding FileASize}" VerticalAlignment="Center" Margin="4,0" />
                 </Grid>
 
-                <TextBox Text="{Binding FileAHexContent, Mode=OneWay}"
-                         IsReadOnly="True"
-                         FontFamily="Consolas"
-                         FontSize="13"
-                         TextWrapping="NoWrap"
+                <TextBox x:Name="FileAHexTextBox"
+                         Text="{Binding FileAHexContent, Mode=OneWay}"
+                          IsReadOnly="True"
+                          FontFamily="Consolas"
+                          FontSize="13"
+                          TextWrapping="NoWrap"
                          AcceptsReturn="True"
                          Background="#1E1E1E"
                          Foreground="#D4D4D4"
@@ -147,11 +152,12 @@
                     <TextBlock Grid.Column="3" Text="{Binding FileBSize}" VerticalAlignment="Center" Margin="4,0" />
                 </Grid>
 
-                <TextBox Text="{Binding FileBHexContent, Mode=OneWay}"
-                         IsReadOnly="True"
-                         FontFamily="Consolas"
-                         FontSize="13"
-                         TextWrapping="NoWrap"
+                <TextBox x:Name="FileBHexTextBox"
+                         Text="{Binding FileBHexContent, Mode=OneWay}"
+                          IsReadOnly="True"
+                          FontFamily="Consolas"
+                          FontSize="13"
+                          TextWrapping="NoWrap"
                          AcceptsReturn="True"
                          Background="#1E1E1E"
                          Foreground="#D4D4D4"
@@ -172,6 +178,7 @@
 
         <!-- 差分一覧 -->
         <DataGrid Grid.Row="3"
+                  x:Name="DiffItemsDataGrid"
                   ItemsSource="{Binding DiffItems}"
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
@@ -188,7 +195,8 @@
                   VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Auto"
                   SelectionMode="Single"
-                  CanUserResizeRows="False">
+                  CanUserResizeRows="False"
+                  SelectionChanged="DiffItemsDataGrid_SelectionChanged">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Offset"      Binding="{Binding Offset}"    Width="130" />
                 <DataGridTextColumn Header="File A Byte" Binding="{Binding FileAByte}" Width="110" />
