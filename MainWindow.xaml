@@ -11,99 +11,106 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 
-        <Style x:Key="HeaderActionButtonStyle" TargetType="Button">
+        <!-- 比較ボタン（Primary） -->
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#185FA5" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="16,6" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#1469B5" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#0F4F90" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- その他ボタン（Secondary） -->
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#FFFFFF" />
             <Setter Property="Foreground" Value="#1A1A1A" />
-            <Setter Property="BorderBrush" Value="#E0DED8" />
+            <Setter Property="BorderBrush" Value="#C0BEB8" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="14,6" />
-            <Setter Property="Margin" Value="0,0,8,0" />
-            <Setter Property="MinHeight" Value="34" />
-            <Setter Property="MinWidth" Value="96" />
-            <Style.Triggers>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.45" />
-                </Trigger>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#F5F4F0" />
-                </Trigger>
-            </Style.Triggers>
+            <Setter Property="Padding" Value="16,6" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#F5F4F0" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#ECEAE5" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
-        <Style x:Key="CancelButtonStyle" TargetType="Button" BasedOn="{StaticResource HeaderActionButtonStyle}">
-            <Setter Property="Background" Value="#FEF2F2" />
-            <Setter Property="Foreground" Value="#991B1B" />
-            <Setter Property="BorderBrush" Value="#FCA5A5" />
-            <Setter Property="MinWidth" Value="112" />
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#FEE2E2" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="HeaderBadgeStyle" TargetType="Border">
+        <!-- キャンセルボタン -->
+        <Style x:Key="CancelButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#FFFFFF" />
-            <Setter Property="BorderBrush" Value="#E0DED8" />
+            <Setter Property="Foreground" Value="#A32D2D" />
+            <Setter Property="BorderBrush" Value="#FCA5A5" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="12,8" />
-            <Setter Property="Margin" Value="0,0,8,0" />
-            <Setter Property="MinHeight" Value="52" />
-        </Style>
-
-        <Style x:Key="BadgeLabelTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#6B7280" />
-            <Setter Property="FontSize" Value="11" />
-        </Style>
-
-        <Style x:Key="BadgeValueTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#111827" />
-            <Setter Property="FontSize" Value="14" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-
-        <Style x:Key="StatusBadgeStyle" TargetType="Border" BasedOn="{StaticResource HeaderBadgeStyle}">
-            <Setter Property="Background" Value="#F5F4F0" />
-            <Setter Property="BorderBrush" Value="#E0DED8" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Idle}">
-                    <Setter Property="Background" Value="#F5F4F0" />
-                    <Setter Property="BorderBrush" Value="#E0DED8" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Ready}">
-                    <Setter Property="Background" Value="#EFF6FF" />
-                    <Setter Property="BorderBrush" Value="#93C5FD" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Comparing}">
-                    <Setter Property="Background" Value="#ECFEFF" />
-                    <Setter Property="BorderBrush" Value="#67E8F9" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Canceled}">
-                    <Setter Property="Background" Value="#FFFBEB" />
-                    <Setter Property="BorderBrush" Value="#FDE68A" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Error}">
-                    <Setter Property="Background" Value="#FEF2F2" />
-                    <Setter Property="BorderBrush" Value="#FCA5A5" />
-                </DataTrigger>
-                <MultiDataTrigger>
-                    <MultiDataTrigger.Conditions>
-                        <Condition Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Completed}" />
-                        <Condition Binding="{Binding HasDifferences}" Value="True" />
-                    </MultiDataTrigger.Conditions>
-                    <Setter Property="Background" Value="#FFF7ED" />
-                    <Setter Property="BorderBrush" Value="#FCD34D" />
-                </MultiDataTrigger>
-                <MultiDataTrigger>
-                    <MultiDataTrigger.Conditions>
-                        <Condition Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Completed}" />
-                        <Condition Binding="{Binding HasDifferences}" Value="False" />
-                    </MultiDataTrigger.Conditions>
-                    <Setter Property="Background" Value="#F0FDF4" />
-                    <Setter Property="BorderBrush" Value="#86EFAC" />
-                </MultiDataTrigger>
-            </Style.Triggers>
+            <Setter Property="Padding" Value="16,6" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#FEF2F2" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#FEE2E2" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
@@ -119,125 +126,164 @@
             <RowDefinition Height="1*" />
         </Grid.RowDefinitions>
 
-        <!-- ヘッダー（ツールバー兼ステータス領域） -->
+        <!-- ツールバー -->
         <Border Grid.Row="0"
                 Background="#FFFFFF"
                 BorderBrush="#E0DED8"
-                BorderThickness="1"
-                Height="92"
-                Padding="12,10"
-                Margin="0,0,0,8"
-                CornerRadius="6">
+                BorderThickness="0,0,0,1"
+                Margin="0,0,0,8">
             <Grid>
-                <Grid Visibility="{Binding IsStatisticsMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="52" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- メイン行：左ボタン群 ＋ 右ステータス -->
+                <Grid Grid.Row="0" Margin="12,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="16" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="16" />
-                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
+                    <!-- 左：ボタン群 -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Content="比較"
                                 Command="{Binding CompareCommand}"
-                                Style="{StaticResource HeaderActionButtonStyle}" />
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Margin="0,0,8,0" />
+                        <Button Content="キャンセル"
+                                Command="{Binding CancelCommand}"
+                                Style="{StaticResource CancelButtonStyle}"
+                                Visibility="{Binding IsComparing, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                Margin="0,0,8,0" />
                         <Button Content="結果をCSV出力"
                                 Command="{Binding ExportCsvCommand}"
-                                Style="{StaticResource HeaderActionButtonStyle}"
-                                MinWidth="132"
-                                Margin="0" />
+                                Style="{StaticResource SecondaryButtonStyle}" />
                     </StackPanel>
 
-                    <UniformGrid Grid.Column="2" Columns="4" Rows="1" VerticalAlignment="Center">
-                        <Border Style="{StaticResource StatusBadgeStyle}">
-                            <StackPanel>
-                                <TextBlock Text="状態" Style="{StaticResource BadgeLabelTextStyle}" />
-                                <TextBlock Text="{Binding CompareStatus}"
-                                           Style="{StaticResource BadgeValueTextStyle}"
-                                           TextTrimming="CharacterEllipsis"
-                                           ToolTip="{Binding CompareStatus}" />
-                            </StackPanel>
+                    <!-- 右：インライン ステータス表示 -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+
+                        <!-- 状態 + バッジ -->
+                        <TextBlock Text="状態：" FontSize="12" Foreground="#888888" VerticalAlignment="Center" />
+                        <Border CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="#F0EFEC" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Comparing}">
+                                            <Setter Property="Background" Value="#E8F3FF" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Canceled}">
+                                            <Setter Property="Background" Value="#FFF8E7" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Error}">
+                                            <Setter Property="Background" Value="#FCEBEB" />
+                                        </DataTrigger>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Completed}" />
+                                                <Condition Binding="{Binding HasDifferences}" Value="True" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Background" Value="#FCEBEB" />
+                                        </MultiDataTrigger>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Completed}" />
+                                                <Condition Binding="{Binding HasDifferences}" Value="False" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Background" Value="#EDFAF3" />
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding CompareStatus}"
+                                       FontSize="12" FontWeight="Medium" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding CompareStatus}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="#6B7280" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Comparing}">
+                                                <Setter Property="Foreground" Value="#185FA5" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Canceled}">
+                                                <Setter Property="Foreground" Value="#8A6A00" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Error}">
+                                                <Setter Property="Foreground" Value="#A32D2D" />
+                                            </DataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Completed}" />
+                                                    <Condition Binding="{Binding HasDifferences}" Value="True" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Foreground" Value="#A32D2D" />
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding CurrentUiState}" Value="{x:Static model:CompareUiState.Completed}" />
+                                                    <Condition Binding="{Binding HasDifferences}" Value="False" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Foreground" Value="#1A7A45" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </Border>
 
-                        <Border Style="{StaticResource HeaderBadgeStyle}">
-                            <StackPanel>
-                                <TextBlock Text="差分総数" Style="{StaticResource BadgeLabelTextStyle}" />
-                                <TextBlock Text="{Binding DiffCountText}" Style="{StaticResource BadgeValueTextStyle}" />
-                            </StackPanel>
-                        </Border>
+                        <Rectangle Width="1" Height="14" Fill="#E0DED8" Margin="12,0" VerticalAlignment="Center" />
 
-                        <Border Style="{StaticResource HeaderBadgeStyle}">
-                            <StackPanel>
-                                <TextBlock Text="最初の差分" Style="{StaticResource BadgeLabelTextStyle}" />
-                                <TextBlock Text="{Binding FirstDiffOffsetText}"
-                                           Style="{StaticResource BadgeValueTextStyle}"
-                                           FontFamily="Cascadia Mono, Consolas" />
-                            </StackPanel>
-                        </Border>
+                        <!-- 差分総数 -->
+                        <TextBlock Text="差分総数：" FontSize="12" Foreground="#888888" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding DiffCountText}" FontSize="12" FontWeight="Medium" Foreground="#1A1A1A" VerticalAlignment="Center" />
 
-                        <Border Style="{StaticResource HeaderBadgeStyle}" Margin="0">
-                            <StackPanel>
-                                <TextBlock Text="ファイルサイズ" Style="{StaticResource BadgeLabelTextStyle}" />
-                                <TextBlock Text="{Binding SameSizeText}" Style="{StaticResource BadgeValueTextStyle}" />
-                            </StackPanel>
-                        </Border>
-                    </UniformGrid>
+                        <Rectangle Width="1" Height="14" Fill="#E0DED8" Margin="12,0" VerticalAlignment="Center" />
 
-                    <Border Grid.Column="4" Style="{StaticResource HeaderBadgeStyle}" Margin="0">
-                        <StackPanel>
-                            <TextBlock Text="選択中の差分" Style="{StaticResource BadgeLabelTextStyle}" />
-                            <TextBlock Text="{Binding SelectedDiffOffsetText}"
-                                       Style="{StaticResource BadgeValueTextStyle}"
-                                       FontFamily="Cascadia Mono, Consolas" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
+                        <!-- 最初の差分 -->
+                        <TextBlock Text="最初の差分：" FontSize="12" Foreground="#888888" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding FirstDiffOffsetText}"
+                                   FontSize="12" FontWeight="Medium" Foreground="#1A1A1A"
+                                   FontFamily="Cascadia Mono, Consolas" VerticalAlignment="Center" />
 
-                <Grid Visibility="{Binding IsComparing, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="16" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="16" />
-                        <ColumnDefinition Width="260" />
-                    </Grid.ColumnDefinitions>
+                        <Rectangle Width="1" Height="14" Fill="#E0DED8" Margin="12,0" VerticalAlignment="Center" />
 
-                    <Button Grid.Column="0"
-                            Content="キャンセル"
-                            Command="{Binding CancelCommand}"
-                            Style="{StaticResource CancelButtonStyle}"
-                            Margin="0"
-                            VerticalAlignment="Center" />
+                        <!-- サイズ -->
+                        <TextBlock Text="サイズ：" FontSize="12" Foreground="#888888" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding SameSizeText}" FontSize="12" FontWeight="Medium" Foreground="#1A1A1A" VerticalAlignment="Center" />
 
-                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                        <Border Style="{StaticResource StatusBadgeStyle}"
-                                HorizontalAlignment="Left"
-                                Margin="0,0,0,8">
-                            <StackPanel>
-                                <TextBlock Text="状態" Style="{StaticResource BadgeLabelTextStyle}" />
-                                <TextBlock Text="{Binding CompareStatus}" Style="{StaticResource BadgeValueTextStyle}" />
-                            </StackPanel>
-                        </Border>
+                        <Rectangle Width="1" Height="14" Fill="#E0DED8" Margin="12,0" VerticalAlignment="Center" />
 
-                        <ProgressBar Value="{Binding ProgressPercentage, Mode=OneWay}"
-                                     Minimum="0"
-                                     Maximum="100"
-                                     Height="6"
-                                     Foreground="#4ADE80"
-                                     Background="#E0DED8"
-                                     BorderThickness="0" />
-                    </StackPanel>
+                        <!-- 選択中 -->
+                        <TextBlock Text="選択中：" FontSize="12" Foreground="#888888" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding SelectedDiffOffsetText}"
+                                   FontSize="12" FontWeight="Medium" Foreground="#1A1A1A"
+                                   FontFamily="Cascadia Mono, Consolas" VerticalAlignment="Center" />
 
-                    <Border Grid.Column="4" Style="{StaticResource HeaderBadgeStyle}" Margin="0">
-                        <StackPanel>
-                            <TextBlock Text="進捗" Style="{StaticResource BadgeLabelTextStyle}" />
+                        <!-- 進捗（比較中のみ表示） -->
+                        <StackPanel Orientation="Horizontal"
+                                    Visibility="{Binding IsComparing, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Rectangle Width="1" Height="14" Fill="#E0DED8" Margin="12,0" VerticalAlignment="Center" />
+                            <TextBlock Text="進捗：" FontSize="12" Foreground="#888888" VerticalAlignment="Center" />
                             <TextBlock Text="{Binding ProgressText}"
-                                       Style="{StaticResource BadgeValueTextStyle}"
-                                       TextTrimming="CharacterEllipsis" />
+                                       FontSize="12" FontWeight="Medium" Foreground="#1A1A1A"
+                                       VerticalAlignment="Center" />
                         </StackPanel>
-                    </Border>
+                    </StackPanel>
                 </Grid>
+
+                <!-- 比較中プログレスバー（下端） -->
+                <ProgressBar Grid.Row="1"
+                             Value="{Binding ProgressPercentage, Mode=OneWay}"
+                             Minimum="0" Maximum="100"
+                             Height="3"
+                             Foreground="#4ADE80"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             Visibility="{Binding IsComparing, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </Grid>
         </Border>
 
@@ -255,7 +301,7 @@
                     <Button Content="ファイルAを開く"
                             Command="{Binding OpenFileACommand}"
                             IsEnabled="{Binding IsFileSelectionEnabled}"
-                            Style="{StaticResource HeaderActionButtonStyle}"
+                            Style="{StaticResource SecondaryButtonStyle}"
                             Margin="0"
                             Padding="10,4" />
                 </StackPanel>
@@ -306,7 +352,7 @@
                     <Button Content="ファイルBを開く"
                             Command="{Binding OpenFileBCommand}"
                             IsEnabled="{Binding IsFileSelectionEnabled}"
-                            Style="{StaticResource HeaderActionButtonStyle}"
+                            Style="{StaticResource SecondaryButtonStyle}"
                             Margin="0"
                             Padding="10,4" />
                 </StackPanel>
