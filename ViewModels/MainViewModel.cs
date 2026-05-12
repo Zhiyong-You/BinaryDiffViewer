@@ -30,11 +30,11 @@ public class MainViewModel : INotifyPropertyChanged
 
     private string _fileAPath = string.Empty;
     private string _fileASize = string.Empty;
-    private string _fileAHexContent = string.Empty;
+    private IReadOnlyList<HexLineViewModel> _fileAHexLines = [];
 
     private string _fileBPath = string.Empty;
     private string _fileBSize = string.Empty;
-    private string _fileBHexContent = string.Empty;
+    private IReadOnlyList<HexLineViewModel> _fileBHexLines = [];
 
     private string _compareStatus = "未比較";
     private string _diffCountText = "-";
@@ -67,10 +67,10 @@ public class MainViewModel : INotifyPropertyChanged
         private set { _fileASize = value; OnPropertyChanged(); }
     }
 
-    public string FileAHexContent
+    public IReadOnlyList<HexLineViewModel> FileAHexLines
     {
-        get => _fileAHexContent;
-        private set { _fileAHexContent = value; OnPropertyChanged(); }
+        get => _fileAHexLines;
+        private set { _fileAHexLines = value; OnPropertyChanged(); }
     }
 
     public string FileBPath
@@ -91,10 +91,10 @@ public class MainViewModel : INotifyPropertyChanged
         private set { _fileBSize = value; OnPropertyChanged(); }
     }
 
-    public string FileBHexContent
+    public IReadOnlyList<HexLineViewModel> FileBHexLines
     {
-        get => _fileBHexContent;
-        private set { _fileBHexContent = value; OnPropertyChanged(); }
+        get => _fileBHexLines;
+        private set { _fileBHexLines = value; OnPropertyChanged(); }
     }
 
     public string CompareStatus
@@ -151,6 +151,10 @@ public class MainViewModel : INotifyPropertyChanged
         private set { _totalMegaBytes = value; OnPropertyChanged(); }
     }
 
+    public double CompareProgress => ProgressPercentage / 100.0;
+    public string ProcessedText => $"{ProcessedMegaBytes:F1} MB / {TotalMegaBytes:F1} MB";
+    public string ProgressPercentageText => $"{ProgressPercentage:F0}%";
+
     public CompareUiState CurrentUiState
     {
         get => _currentUiState;
@@ -191,6 +195,11 @@ public class MainViewModel : INotifyPropertyChanged
     public bool CanCompareFiles => HasBothFiles && !IsComparing;
 
     public bool CanExportResults => CurrentUiState == CompareUiState.Completed && HasComparisonResult;
+
+    public bool HasDiffLimit => _hasComparisonResult && _lastDisplayDiffItems.Count < _lastTotalDiffCount;
+    public string DiffLimitText => HasDiffLimit
+        ? $"表示件数上限: {_lastDisplayDiffItems.Count:N0} 件  /  全 {_lastTotalDiffCount:N0} 件"
+        : string.Empty;
 
     public ICommand OpenFileACommand { get; }
     public ICommand OpenFileBCommand { get; }
@@ -317,8 +326,8 @@ public class MainViewModel : INotifyPropertyChanged
             : "なし";
         SameSizeText = result.IsSameSize ? "同じ" : "異なる";
 
-        FileAHexContent = HexFormatter.GenerateDiffHexView(_bytesA, result.DisplayDiffItems, isFileA: true);
-        FileBHexContent = HexFormatter.GenerateDiffHexView(_bytesB, result.DisplayDiffItems, isFileA: false);
+        FileAHexLines = HexViewBuilder.BuildDiff(_bytesA, result.DisplayDiffItems, isFileA: true);
+        FileBHexLines = HexViewBuilder.BuildDiff(_bytesB, result.DisplayDiffItems, isFileA: false);
 
         _lastDisplayDiffItems = result.DisplayDiffItems;
         DiffItems = result.DisplayDiffItems
@@ -371,8 +380,8 @@ public class MainViewModel : INotifyPropertyChanged
 
     private void ResetHexPreview()
     {
-        FileAHexContent = HexFormatter.GeneratePlainHexView(_bytesA);
-        FileBHexContent = HexFormatter.GeneratePlainHexView(_bytesB);
+        FileAHexLines = HexViewBuilder.BuildPlain(_bytesA);
+        FileBHexLines = HexViewBuilder.BuildPlain(_bytesB);
     }
 
     private void UpdateProgress(BinaryCompareProgress progress)
@@ -388,6 +397,9 @@ public class MainViewModel : INotifyPropertyChanged
             ? Math.Min(100.0, processedBytes * 100.0 / totalBytes)
             : 0;
         ProgressText = $"{ProcessedMegaBytes:F1} MB / {TotalMegaBytes:F1} MB ({ProgressPercentage:F1}%)";
+        OnPropertyChanged(nameof(CompareProgress));
+        OnPropertyChanged(nameof(ProcessedText));
+        OnPropertyChanged(nameof(ProgressPercentageText));
     }
 
     private void NotifyComparisonStateChanged()
@@ -395,6 +407,8 @@ public class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasComparisonResult));
         OnPropertyChanged(nameof(HasDifferences));
         OnPropertyChanged(nameof(CanExportResults));
+        OnPropertyChanged(nameof(HasDiffLimit));
+        OnPropertyChanged(nameof(DiffLimitText));
     }
 
     public void SetSelectedDiffOffset(long? offset)
@@ -415,16 +429,17 @@ public class MainViewModel : INotifyPropertyChanged
         var startLineIndex = Math.Max(selectedLineIndex - (FocusedHexViewLineCount / 2), 0);
         var startOffset = startLineIndex * BytesPerHexLine;
 
-        FileAHexContent = BuildFocusedHexView(FileAPath, startOffset, isFileA: true);
-        FileBHexContent = BuildFocusedHexView(FileBPath, startOffset, isFileA: false);
+        FileAHexLines = BuildFocusedHexLines(FileAPath, startOffset, isFileA: true, offset);
+        FileBHexLines = BuildFocusedHexLines(FileBPath, startOffset, isFileA: false, offset);
 
         return (int)(selectedLineIndex - startLineIndex);
     }
 
-    private string BuildFocusedHexView(string filePath, long startOffset, bool isFileA)
+    private IReadOnlyList<HexLineViewModel> BuildFocusedHexLines(
+        string filePath, long startOffset, bool isFileA, long highlightOffset)
     {
         var bytes = _fileService.ReadBytes(filePath, startOffset, FocusedHexViewByteCount);
-        return HexFormatter.GenerateDiffHexView(bytes, _lastDisplayDiffItems, isFileA, startOffset);
+        return HexViewBuilder.BuildDiff(bytes, _lastDisplayDiffItems, isFileA, startOffset, highlightOffset);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

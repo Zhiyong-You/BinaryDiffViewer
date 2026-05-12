@@ -78,6 +78,32 @@
             </Setter>
         </Style>
 
+        <!-- 進捗バー -->
+        <Style x:Key="CompareProgressBarStyle" TargetType="ProgressBar">
+            <Setter Property="Height" Value="6" />
+            <Setter Property="Minimum" Value="0" />
+            <Setter Property="Maximum" Value="1" />
+            <Setter Property="Background" Value="#E0DED8" />
+            <Setter Property="Foreground" Value="#185FA5" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="3"
+                                ClipToBounds="True">
+                            <Grid>
+                                <Border x:Name="PART_Track" />
+                                <Border x:Name="PART_Indicator"
+                                        Background="{TemplateBinding Foreground}"
+                                        HorizontalAlignment="Left" />
+                            </Grid>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- キャンセルボタン -->
         <Style x:Key="CancelButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#FFFFFF" />
@@ -112,6 +138,112 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Hex Viewer 行テンプレート（File A / B 共用） -->
+        <DataTemplate x:Key="HexRowTemplate">
+            <StackPanel Orientation="Horizontal">
+                <!-- Offset -->
+                <TextBlock Text="{Binding OffsetText}"
+                           Width="92"
+                           Foreground="#185FA5"
+                           FontFamily="Cascadia Mono, Consolas"
+                           FontSize="12" />
+
+                <!-- Hex バイト群（16 セル） -->
+                <ItemsControl ItemsSource="{Binding Cells}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Width="22">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDiff}" Value="True">
+                                                <Setter Property="Background" Value="#FAECE7" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding HexText}"
+                                           FontFamily="Cascadia Mono, Consolas"
+                                           FontSize="12">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="#1A1A1A" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsDiff}" Value="True">
+                                                    <Setter Property="Foreground" Value="#993C1D" />
+                                                    <Setter Property="FontWeight" Value="Bold" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- ASCII 列（左ボーダー付き） -->
+                <Border BorderBrush="#E0DED8" BorderThickness="1,0,0,0" Padding="8,0,4,0" Margin="4,0,0,0">
+                    <ItemsControl ItemsSource="{Binding Cells}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding AsciiText}"
+                                           Width="8"
+                                           FontFamily="Cascadia Mono, Consolas"
+                                           FontSize="12">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="#888888" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsDiff}" Value="True">
+                                                    <Setter Property="Foreground" Value="#993C1D" />
+                                                    <Setter Property="FontWeight" Value="Bold" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Hex Viewer 行スタイル -->
+        <Style x:Key="HexListBoxItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="4,1" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd" Background="Transparent" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#F5F4F0" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsHighlighted}" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#EAF3DE" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Window.DataContext>
@@ -133,13 +265,8 @@
                 BorderThickness="0,0,0,1"
                 Margin="0,0,0,8">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="52" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <!-- メイン行：左ボタン群 ＋ 右ステータス -->
-                <Grid Grid.Row="0" Margin="12,0">
+                <!-- メイン行：左ボタン群 ＋ 中央進捗 ＋ 右ステータス -->
+                <Grid Height="52" Margin="12,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -151,6 +278,7 @@
                         <Button Content="比較"
                                 Command="{Binding CompareCommand}"
                                 Style="{StaticResource PrimaryButtonStyle}"
+                                Visibility="{Binding IsStatisticsMode, Converter={StaticResource BooleanToVisibilityConverter}}"
                                 Margin="0,0,8,0" />
                         <Button Content="キャンセル"
                                 Command="{Binding CancelCommand}"
@@ -159,11 +287,42 @@
                                 Margin="0,0,8,0" />
                         <Button Content="結果をCSV出力"
                                 Command="{Binding ExportCsvCommand}"
-                                Style="{StaticResource SecondaryButtonStyle}" />
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Visibility="{Binding IsStatisticsMode, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     </StackPanel>
 
-                    <!-- 右：インライン ステータス表示 -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- 中央：進捗バーエリア（比較中のみ） -->
+                    <Grid Grid.Column="1"
+                          Visibility="{Binding IsComparing, Converter={StaticResource BooleanToVisibilityConverter}}"
+                          Margin="20,0"
+                          VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding ProcessedText}"
+                                   FontSize="11" Foreground="#888888"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,10,0" />
+
+                        <ProgressBar Grid.Column="1"
+                                     Value="{Binding CompareProgress, Mode=OneWay}"
+                                     Style="{StaticResource CompareProgressBarStyle}"
+                                     VerticalAlignment="Center" />
+
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding ProgressPercentageText}"
+                                   FontSize="11" Foreground="#888888"
+                                   VerticalAlignment="Center"
+                                   Margin="10,0,0,0" />
+                    </Grid>
+
+                    <!-- 右：インライン ステータス表示（比較中は非表示） -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
+                                Visibility="{Binding IsStatisticsMode, Converter={StaticResource BooleanToVisibilityConverter}}">
 
                         <!-- 状態 + バッジ -->
                         <TextBlock Text="状態：" FontSize="12" Foreground="#888888" VerticalAlignment="Center" />
@@ -263,31 +422,12 @@
                                    FontSize="12" FontWeight="Medium" Foreground="#1A1A1A"
                                    FontFamily="Cascadia Mono, Consolas" VerticalAlignment="Center" />
 
-                        <!-- 進捗（比較中のみ表示） -->
-                        <StackPanel Orientation="Horizontal"
-                                    Visibility="{Binding IsComparing, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <Rectangle Width="1" Height="14" Fill="#E0DED8" Margin="12,0" VerticalAlignment="Center" />
-                            <TextBlock Text="進捗：" FontSize="12" Foreground="#888888" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding ProgressText}"
-                                       FontSize="12" FontWeight="Medium" Foreground="#1A1A1A"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
                     </StackPanel>
                 </Grid>
-
-                <!-- 比較中プログレスバー（下端） -->
-                <ProgressBar Grid.Row="1"
-                             Value="{Binding ProgressPercentage, Mode=OneWay}"
-                             Minimum="0" Maximum="100"
-                             Height="3"
-                             Foreground="#4ADE80"
-                             Background="Transparent"
-                             BorderThickness="0"
-                             Visibility="{Binding IsComparing, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </Grid>
         </Border>
 
-        <!-- 16進数表示エリア（左右分割） -->
+        <!-- Hex Viewer エリア（左右分割） -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -295,49 +435,60 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- ファイルA（左側） -->
-            <DockPanel Grid.Column="0">
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
-                    <Button Content="ファイルAを開く"
-                            Command="{Binding OpenFileACommand}"
-                            IsEnabled="{Binding IsFileSelectionEnabled}"
-                            Style="{StaticResource SecondaryButtonStyle}"
-                            Margin="0"
-                            Padding="10,4" />
-                </StackPanel>
+            <!-- File A パネル -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-                <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="パス：" VerticalAlignment="Center" Foreground="#6B7280" />
-                    <TextBox   Grid.Column="1" Text="{Binding FileAPath, Mode=OneWay}"
-                               IsReadOnly="True" Margin="4,0" VerticalAlignment="Center"
-                               Background="#FFFFFF" BorderBrush="#E0DED8" Foreground="#1A1A1A" />
-                    <TextBlock Grid.Column="2" Text="サイズ：" VerticalAlignment="Center" Margin="12,0,0,0" Foreground="#6B7280" />
-                    <TextBlock Grid.Column="3" Text="{Binding FileASize}" VerticalAlignment="Center" Margin="4,0" Foreground="#1A1A1A" />
-                </Grid>
-
-                <Border BorderBrush="#E0DED8" BorderThickness="1" CornerRadius="6" ClipToBounds="True">
-                    <TextBox x:Name="FileAHexTextBox"
-                             Text="{Binding FileAHexContent, Mode=OneWay}"
-                             IsReadOnly="True"
-                             FontFamily="Cascadia Mono, Consolas"
-                             FontSize="12"
-                             TextWrapping="NoWrap"
-                             AcceptsReturn="True"
-                             Background="#FFFFFF"
-                             Foreground="#1A1A1A"
-                             CaretBrush="Transparent"
-                             BorderThickness="0"
-                             Padding="8"
-                             HorizontalScrollBarVisibility="Auto"
-                             VerticalScrollBarVisibility="Auto" />
+                <Border Grid.Row="0"
+                        Background="#F5F4F0"
+                        BorderBrush="#E0DED8"
+                        BorderThickness="0,0,0,1"
+                        Padding="10,7">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Background="#E6F1FB" CornerRadius="20" Padding="8,1" Margin="0,0,8,0">
+                                <TextBlock Text="File A" Foreground="#185FA5" FontSize="11" FontWeight="Medium" />
+                            </Border>
+                            <Button Content="開く"
+                                    Command="{Binding OpenFileACommand}"
+                                    IsEnabled="{Binding IsFileSelectionEnabled}"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Padding="8,2" FontSize="11" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding FileAPath}"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"
+                                   FontSize="12" Foreground="#1A1A1A"
+                                   Margin="10,0" />
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding FileASize}"
+                                   VerticalAlignment="Center"
+                                   FontSize="11" Foreground="#888888" />
+                    </Grid>
                 </Border>
-            </DockPanel>
+
+                <ListBox Grid.Row="1"
+                         x:Name="FileAHexListBox"
+                         ItemsSource="{Binding FileAHexLines}"
+                         Background="#FFFFFF"
+                         BorderThickness="0"
+                         Padding="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         ItemContainerStyle="{StaticResource HexListBoxItemStyle}"
+                         ItemTemplate="{StaticResource HexRowTemplate}" />
+            </Grid>
 
             <!-- 垂直スプリッター -->
             <GridSplitter Grid.Column="1"
@@ -346,49 +497,60 @@
                           VerticalAlignment="Stretch"
                           Background="#E0DED8" />
 
-            <!-- ファイルB（右側） -->
-            <DockPanel Grid.Column="2">
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
-                    <Button Content="ファイルBを開く"
-                            Command="{Binding OpenFileBCommand}"
-                            IsEnabled="{Binding IsFileSelectionEnabled}"
-                            Style="{StaticResource SecondaryButtonStyle}"
-                            Margin="0"
-                            Padding="10,4" />
-                </StackPanel>
+            <!-- File B パネル -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-                <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="パス：" VerticalAlignment="Center" Foreground="#6B7280" />
-                    <TextBox   Grid.Column="1" Text="{Binding FileBPath, Mode=OneWay}"
-                               IsReadOnly="True" Margin="4,0" VerticalAlignment="Center"
-                               Background="#FFFFFF" BorderBrush="#E0DED8" Foreground="#1A1A1A" />
-                    <TextBlock Grid.Column="2" Text="サイズ：" VerticalAlignment="Center" Margin="12,0,0,0" Foreground="#6B7280" />
-                    <TextBlock Grid.Column="3" Text="{Binding FileBSize}" VerticalAlignment="Center" Margin="4,0" Foreground="#1A1A1A" />
-                </Grid>
-
-                <Border BorderBrush="#E0DED8" BorderThickness="1" CornerRadius="6" ClipToBounds="True">
-                    <TextBox x:Name="FileBHexTextBox"
-                             Text="{Binding FileBHexContent, Mode=OneWay}"
-                             IsReadOnly="True"
-                             FontFamily="Cascadia Mono, Consolas"
-                             FontSize="12"
-                             TextWrapping="NoWrap"
-                             AcceptsReturn="True"
-                             Background="#FFFFFF"
-                             Foreground="#1A1A1A"
-                             CaretBrush="Transparent"
-                             BorderThickness="0"
-                             Padding="8"
-                             HorizontalScrollBarVisibility="Auto"
-                             VerticalScrollBarVisibility="Auto" />
+                <Border Grid.Row="0"
+                        Background="#F5F4F0"
+                        BorderBrush="#E0DED8"
+                        BorderThickness="0,0,0,1"
+                        Padding="10,7">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Background="#FAEEDA" CornerRadius="20" Padding="8,1" Margin="0,0,8,0">
+                                <TextBlock Text="File B" Foreground="#854F0B" FontSize="11" FontWeight="Medium" />
+                            </Border>
+                            <Button Content="開く"
+                                    Command="{Binding OpenFileBCommand}"
+                                    IsEnabled="{Binding IsFileSelectionEnabled}"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Padding="8,2" FontSize="11" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding FileBPath}"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"
+                                   FontSize="12" Foreground="#1A1A1A"
+                                   Margin="10,0" />
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding FileBSize}"
+                                   VerticalAlignment="Center"
+                                   FontSize="11" Foreground="#888888" />
+                    </Grid>
                 </Border>
-            </DockPanel>
+
+                <ListBox Grid.Row="1"
+                         x:Name="FileBHexListBox"
+                         ItemsSource="{Binding FileBHexLines}"
+                         Background="#FFFFFF"
+                         BorderThickness="0"
+                         Padding="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         ItemContainerStyle="{StaticResource HexListBoxItemStyle}"
+                         ItemTemplate="{StaticResource HexRowTemplate}" />
+            </Grid>
         </Grid>
 
         <!-- 水平スプリッター -->
@@ -399,34 +561,164 @@
                       Background="#E0DED8" />
 
         <!-- 差分一覧 -->
-        <Border Grid.Row="3" Margin="0,4,0,0"
-                BorderBrush="#E0DED8" BorderThickness="1" CornerRadius="6">
-            <DataGrid x:Name="DiffItemsDataGrid"
-                      ItemsSource="{Binding DiffItems}"
-                      AutoGenerateColumns="False"
-                      IsReadOnly="True"
-                      FontFamily="Cascadia Mono, Consolas"
-                      FontSize="12"
-                      Background="#FFFFFF"
-                      Foreground="#1A1A1A"
-                      RowBackground="#FFFFFF"
-                      AlternatingRowBackground="#F5F4F0"
-                      GridLinesVisibility="Horizontal"
-                      HorizontalGridLinesBrush="#E0DED8"
-                      BorderThickness="0"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Auto"
-                      SelectionMode="Single"
-                      CanUserResizeRows="False"
-                      IsEnabled="{Binding IsDiffItemsEnabled}"
-                      SelectionChanged="DiffItemsDataGrid_SelectionChanged">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Offset"      Binding="{Binding Offset}"    Width="130" />
-                    <DataGridTextColumn Header="File A Byte" Binding="{Binding FileAByte}" Width="110" />
-                    <DataGridTextColumn Header="File B Byte" Binding="{Binding FileBByte}" Width="110" />
-                    <DataGridTextColumn Header="Diff Type"   Binding="{Binding DiffType}"  Width="*" />
-                </DataGrid.Columns>
-            </DataGrid>
-        </Border>
+        <Grid Grid.Row="3" Margin="0,4,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" BorderBrush="#E0DED8" BorderThickness="0,1,0,0">
+                <DataGrid x:Name="DiffItemsDataGrid"
+                          ItemsSource="{Binding DiffItems}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          FontFamily="Cascadia Mono, Consolas"
+                          FontSize="12"
+                          Background="#FFFFFF"
+                          Foreground="#1A1A1A"
+                          GridLinesVisibility="None"
+                          BorderThickness="0"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Auto"
+                          SelectionMode="Single"
+                          CanUserResizeRows="False"
+                          IsEnabled="{Binding IsDiffItemsEnabled}"
+                          SelectionChanged="DiffItemsDataGrid_SelectionChanged">
+                    <DataGrid.Resources>
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="Background" Value="#F5F4F0" />
+                            <Setter Property="Foreground" Value="#888888" />
+                            <Setter Property="FontSize" Value="11" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                            <Setter Property="Padding" Value="10,6" />
+                            <Setter Property="BorderBrush" Value="#E0DED8" />
+                            <Setter Property="BorderThickness" Value="0,0,0,1" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="DataGridColumnHeader">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                Padding="{TemplateBinding Padding}">
+                                            <TextBlock Text="{TemplateBinding Content}"
+                                                       Foreground="{TemplateBinding Foreground}"
+                                                       FontSize="{TemplateBinding FontSize}"
+                                                       FontWeight="{TemplateBinding FontWeight}"
+                                                       VerticalAlignment="Center" />
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                        <Style TargetType="DataGridRow">
+                            <Setter Property="Background" Value="#FFFFFF" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="DataGridRow">
+                                        <Border x:Name="RowBorder"
+                                                Background="{TemplateBinding Background}"
+                                                BorderBrush="#E0DED8"
+                                                BorderThickness="0,0,0,1">
+                                            <DataGridCellsPresenter />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="RowBorder" Property="Background" Value="#F5F4F0" />
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="RowBorder" Property="Background" Value="#E6F1FB" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                        <Style TargetType="DataGridCell">
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="DataGridCell">
+                                        <Border Background="Transparent" Padding="0">
+                                            <ContentPresenter />
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </DataGrid.Resources>
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Header="OFFSET" Width="130" SortMemberPath="Offset">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Offset}"
+                                               Foreground="#185FA5"
+                                               Padding="10,5"
+                                               VerticalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="FILE A" Width="110" SortMemberPath="FileAByte">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding FileAByte}"
+                                               Foreground="#CC4400"
+                                               Padding="10,5"
+                                               VerticalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="FILE B" Width="110" SortMemberPath="FileBByte">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding FileBByte}"
+                                               Foreground="#1A7A45"
+                                               Padding="10,5"
+                                               VerticalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="TYPE" Width="*" SortMemberPath="DiffType">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border x:Name="TypeBadge"
+                                            Margin="10,4"
+                                            Padding="8,2"
+                                            CornerRadius="4"
+                                            Background="#FAEEDA"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center">
+                                        <TextBlock x:Name="TypeText"
+                                                   Text="{Binding DiffType}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#854F0B" />
+                                    </Border>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding DiffType}" Value="Added">
+                                            <Setter TargetName="TypeBadge" Property="Background" Value="#EDFAF3" />
+                                            <Setter TargetName="TypeText" Property="Foreground" Value="#1A7A45" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding DiffType}" Value="Removed">
+                                            <Setter TargetName="TypeBadge" Property="Background" Value="#FCEBEB" />
+                                            <Setter TargetName="TypeText" Property="Foreground" Value="#A32D2D" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+
+            <Border Grid.Row="1"
+                    Visibility="{Binding HasDiffLimit, Converter={StaticResource BooleanToVisibilityConverter}}"
+                    BorderBrush="#E0DED8" BorderThickness="0,1,0,0"
+                    Padding="12,6">
+                <TextBlock Text="{Binding DiffLimitText}"
+                           FontSize="11"
+                           Foreground="#888888" />
+            </Border>
+        </Grid>
     </Grid>
 </Window>

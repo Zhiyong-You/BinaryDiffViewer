@@ -32,8 +32,8 @@ public partial class MainWindow : Window
     {
         DetachHexScrollSync();
 
-        _fileAHexScrollViewer = FindScrollViewer(FileAHexTextBox);
-        _fileBHexScrollViewer = FindScrollViewer(FileBHexTextBox);
+        _fileAHexScrollViewer = FindScrollViewer(FileAHexListBox);
+        _fileBHexScrollViewer = FindScrollViewer(FileBHexListBox);
 
         if (_fileAHexScrollViewer is null || _fileBHexScrollViewer is null)
             return;
@@ -46,7 +46,6 @@ public partial class MainWindow : Window
     {
         if (_fileAHexScrollViewer is not null)
             _fileAHexScrollViewer.ScrollChanged -= HexScrollViewer_ScrollChanged;
-
         if (_fileBHexScrollViewer is not null)
             _fileBHexScrollViewer.ScrollChanged -= HexScrollViewer_ScrollChanged;
 
@@ -57,30 +56,22 @@ public partial class MainWindow : Window
 
     private void HexScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {
-        if (_isSyncingHexScroll || sender is not ScrollViewer sourceScrollViewer)
-            return;
+        if (_isSyncingHexScroll || sender is not ScrollViewer src) return;
+        if (e.VerticalChange == 0 && e.HorizontalChange == 0) return;
 
-        if (e.VerticalChange == 0 && e.HorizontalChange == 0)
-            return;
-
-        var targetScrollViewer = ReferenceEquals(sourceScrollViewer, _fileAHexScrollViewer)
+        var target = ReferenceEquals(src, _fileAHexScrollViewer)
             ? _fileBHexScrollViewer
             : _fileAHexScrollViewer;
 
-        if (targetScrollViewer is null)
-            return;
+        if (target is null) return;
 
         _isSyncingHexScroll = true;
         try
         {
-            var targetVerticalOffset = Math.Min(sourceScrollViewer.VerticalOffset, targetScrollViewer.ScrollableHeight);
-            var targetHorizontalOffset = Math.Min(sourceScrollViewer.HorizontalOffset, targetScrollViewer.ScrollableWidth);
-
-            if (!AreClose(targetScrollViewer.VerticalOffset, targetVerticalOffset))
-                targetScrollViewer.ScrollToVerticalOffset(targetVerticalOffset);
-
-            if (!AreClose(targetScrollViewer.HorizontalOffset, targetHorizontalOffset))
-                targetScrollViewer.ScrollToHorizontalOffset(targetHorizontalOffset);
+            var v = Math.Min(src.VerticalOffset, target.ScrollableHeight);
+            var h = Math.Min(src.HorizontalOffset, target.ScrollableWidth);
+            if (!AreClose(target.VerticalOffset, v)) target.ScrollToVerticalOffset(v);
+            if (!AreClose(target.HorizontalOffset, h)) target.ScrollToHorizontalOffset(h);
         }
         finally
         {
@@ -90,21 +81,20 @@ public partial class MainWindow : Window
 
     private void DiffItemsDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (DataContext is not ViewModels.MainViewModel viewModel)
-            return;
+        if (DataContext is not ViewModels.MainViewModel vm) return;
 
-        if (sender is not DataGrid dataGrid || dataGrid.SelectedItem is not ViewModels.DiffItemViewModel selectedDiff)
+        if (sender is not DataGrid grid || grid.SelectedItem is not ViewModels.DiffItemViewModel selected)
         {
-            viewModel.SetSelectedDiffOffset(null);
+            vm.SetSelectedDiffOffset(null);
             return;
         }
 
-        JumpHexViewsToOffset(viewModel, selectedDiff.OffsetValue);
+        JumpHexViewsToOffset(vm, selected.OffsetValue);
     }
 
-    private void JumpHexViewsToOffset(ViewModels.MainViewModel viewModel, long offset)
+    private void JumpHexViewsToOffset(ViewModels.MainViewModel vm, long offset)
     {
-        var localLineIndex = viewModel.FocusHexViewOnOffset(offset);
+        var localLineIndex = vm.FocusHexViewOnOffset(offset);
 
         Dispatcher.BeginInvoke(() =>
         {
@@ -112,15 +102,14 @@ public partial class MainWindow : Window
                 AttachHexScrollSync();
 
             UpdateLayout();
-            FileAHexTextBox.UpdateLayout();
-            FileBHexTextBox.UpdateLayout();
+            FileAHexListBox.UpdateLayout();
+            FileBHexListBox.UpdateLayout();
 
             _isSyncingHexScroll = true;
             try
             {
-                ScrollHexTextBoxToLine(FileAHexTextBox, _fileAHexScrollViewer, localLineIndex);
-                ScrollHexTextBoxToLine(FileBHexTextBox, _fileBHexScrollViewer, localLineIndex);
-
+                ScrollListBoxToLine(FileAHexListBox, _fileAHexScrollViewer, localLineIndex);
+                ScrollListBoxToLine(FileBHexListBox, _fileBHexScrollViewer, localLineIndex);
                 _fileAHexScrollViewer?.ScrollToHorizontalOffset(0);
                 _fileBHexScrollViewer?.ScrollToHorizontalOffset(0);
             }
@@ -131,61 +120,37 @@ public partial class MainWindow : Window
         }, DispatcherPriority.Background);
     }
 
-    private static void ScrollHexTextBoxToLine(TextBox textBox, ScrollViewer? scrollViewer, long targetLineIndex)
+    private static void ScrollListBoxToLine(ListBox listBox, ScrollViewer? scrollViewer, int targetLineIndex)
     {
-        if (scrollViewer is null || string.IsNullOrEmpty(textBox.Text))
-            return;
+        if (scrollViewer is null || listBox.Items.Count == 0) return;
 
-        var maxLineIndex = Math.Max(textBox.LineCount - 1, 0);
-        var clampedLineIndex = ClampLineIndex(targetLineIndex, maxLineIndex);
-        var visibleLineCount = EstimateVisibleLineCount(textBox, scrollViewer);
-        var topLineIndex = Math.Max(clampedLineIndex - (visibleLineCount / 2), 0);
+        var clamped = Math.Max(0, Math.Min(targetLineIndex, listBox.Items.Count - 1));
 
-        textBox.ScrollToLine(topLineIndex);
-    }
-
-    private static int ClampLineIndex(long lineIndex, int maxLineIndex)
-    {
-        if (lineIndex <= 0)
-            return 0;
-
-        if (lineIndex >= maxLineIndex)
-            return maxLineIndex;
-
-        return (int)lineIndex;
-    }
-
-    private static int EstimateVisibleLineCount(TextBox textBox, ScrollViewer scrollViewer)
-    {
-        var lineHeight = textBox.FontFamily.LineSpacing > 0
-            ? textBox.FontFamily.LineSpacing * textBox.FontSize
-            : textBox.FontSize * 1.2;
-
-        if (lineHeight <= 0 || scrollViewer.ViewportHeight <= 0)
-            return 1;
-
-        return Math.Max(1, (int)(scrollViewer.ViewportHeight / lineHeight));
+        // 実アイテム高さを取得してセンタリングオフセットを計算
+        if (listBox.ItemContainerGenerator.ContainerFromIndex(0) is FrameworkElement first
+            && first.ActualHeight > 0)
+        {
+            var itemH = first.ActualHeight;
+            var viewH = scrollViewer.ViewportHeight;
+            var topLine = Math.Max(0, clamped - (int)(viewH / itemH / 2));
+            scrollViewer.ScrollToVerticalOffset(topLine * itemH);
+        }
+        else
+        {
+            listBox.ScrollIntoView(listBox.Items[clamped]);
+        }
     }
 
     private static ScrollViewer? FindScrollViewer(DependencyObject root)
     {
-        if (root is ScrollViewer scrollViewer)
-            return scrollViewer;
-
-        var childCount = VisualTreeHelper.GetChildrenCount(root);
-        for (int i = 0; i < childCount; i++)
+        if (root is ScrollViewer sv) return sv;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
         {
-            var child = VisualTreeHelper.GetChild(root, i);
-            var descendant = FindScrollViewer(child);
-            if (descendant is not null)
-                return descendant;
+            var found = FindScrollViewer(VisualTreeHelper.GetChild(root, i));
+            if (found is not null) return found;
         }
-
         return null;
     }
 
-    private static bool AreClose(double left, double right)
-    {
-        return Math.Abs(left - right) < 0.5;
-    }
+    private static bool AreClose(double a, double b) => Math.Abs(a - b) < 0.5;
 }
