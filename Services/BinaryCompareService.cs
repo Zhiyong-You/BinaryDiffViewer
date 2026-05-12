@@ -11,7 +11,7 @@ public class BinaryCompareService
     public async Task<BinaryDiffResult> CompareAsync(
         string filePathA,
         string filePathB,
-        IProgress<double>? progress = null,
+        IProgress<BinaryCompareProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         var sizeA = new FileInfo(filePathA).Length;
@@ -74,8 +74,7 @@ public class BinaryCompareService
 
             globalOffset += maxRead;
 
-            if (totalBytes > 0)
-                progress?.Report((double)globalOffset / totalBytes * 100.0);
+            progress?.Report(new BinaryCompareProgress(globalOffset, totalBytes));
         }
 
         return new BinaryDiffResult(

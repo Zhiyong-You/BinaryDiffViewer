@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Input;
 using BinaryDiffViewer.Commands;
+using BinaryDiffViewer.Models;
 using BinaryDiffViewer.Services;
 using Microsoft.Win32;
 
@@ -12,6 +14,7 @@ public class MainViewModel : INotifyPropertyChanged
     private const int BytesPerHexLine = 16;
     private const int FocusedHexViewLineCount = 256;
     private const int FocusedHexViewByteCount = FocusedHexViewLineCount * BytesPerHexLine;
+    private const double BytesPerMegabyte = 1024.0 * 1024.0;
 
     private readonly BinaryFileService _fileService = new();
     private readonly BinaryCompareService _compareService = new();
@@ -19,8 +22,11 @@ public class MainViewModel : INotifyPropertyChanged
 
     private byte[] _bytesA = [];
     private byte[] _bytesB = [];
-    private bool _isComparing;
     private CancellationTokenSource? _cts;
+    private long _fileASizeBytes;
+    private long _fileBSizeBytes;
+    private long _lastTotalDiffCount;
+    private bool _hasComparisonResult;
 
     private string _fileAPath = string.Empty;
     private string _fileASize = string.Empty;
@@ -35,14 +41,24 @@ public class MainViewModel : INotifyPropertyChanged
     private string _firstDiffOffsetText = "-";
     private string _sameSizeText = "-";
     private string _selectedDiffOffsetText = "-";
-    private double _progress;
+    private string _progressText = "0.0 MB / 0.0 MB (0.0%)";
+    private double _progressPercentage;
+    private double _processedMegaBytes;
+    private double _totalMegaBytes;
+    private CompareUiState _currentUiState = CompareUiState.Idle;
     private IReadOnlyList<DiffItemViewModel> _diffItems = [];
-    private IReadOnlyList<BinaryDiffViewer.Models.BinaryDiffItem> _lastDisplayDiffItems = [];
+    private IReadOnlyList<BinaryDiffItem> _lastDisplayDiffItems = [];
 
     public string FileAPath
     {
         get => _fileAPath;
-        private set { _fileAPath = value; OnPropertyChanged(); }
+        private set
+        {
+            if (_fileAPath == value) return;
+            _fileAPath = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanCompareFiles));
+        }
     }
 
     public string FileASize
@@ -60,7 +76,13 @@ public class MainViewModel : INotifyPropertyChanged
     public string FileBPath
     {
         get => _fileBPath;
-        private set { _fileBPath = value; OnPropertyChanged(); }
+        private set
+        {
+            if (_fileBPath == value) return;
+            _fileBPath = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanCompareFiles));
+        }
     }
 
     public string FileBSize
@@ -105,10 +127,47 @@ public class MainViewModel : INotifyPropertyChanged
         private set { _selectedDiffOffsetText = value; OnPropertyChanged(); }
     }
 
-    public double Progress
+    public string ProgressText
     {
-        get => _progress;
-        private set { _progress = value; OnPropertyChanged(); }
+        get => _progressText;
+        private set { _progressText = value; OnPropertyChanged(); }
+    }
+
+    public double ProgressPercentage
+    {
+        get => _progressPercentage;
+        private set { _progressPercentage = value; OnPropertyChanged(); }
+    }
+
+    public double ProcessedMegaBytes
+    {
+        get => _processedMegaBytes;
+        private set { _processedMegaBytes = value; OnPropertyChanged(); }
+    }
+
+    public double TotalMegaBytes
+    {
+        get => _totalMegaBytes;
+        private set { _totalMegaBytes = value; OnPropertyChanged(); }
+    }
+
+    public CompareUiState CurrentUiState
+    {
+        get => _currentUiState;
+        private set
+        {
+            if (_currentUiState == value) return;
+
+            _currentUiState = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsComparing));
+            OnPropertyChanged(nameof(IsStatisticsMode));
+            OnPropertyChanged(nameof(IsFileSelectionEnabled));
+            OnPropertyChanged(nameof(IsDiffItemsEnabled));
+            OnPropertyChanged(nameof(CanCompareFiles));
+            OnPropertyChanged(nameof(CanExportResults));
+            CommandManager.InvalidateRequerySuggested();
+        }
     }
 
     public IReadOnlyList<DiffItemViewModel> DiffItems
@@ -116,6 +175,22 @@ public class MainViewModel : INotifyPropertyChanged
         get => _diffItems;
         private set { _diffItems = value; OnPropertyChanged(); }
     }
+
+    public bool IsComparing => CurrentUiState == CompareUiState.Comparing;
+
+    public bool IsStatisticsMode => !IsComparing;
+
+    public bool IsFileSelectionEnabled => !IsComparing;
+
+    public bool IsDiffItemsEnabled => !IsComparing;
+
+    public bool HasComparisonResult => _hasComparisonResult;
+
+    public bool HasDifferences => _hasComparisonResult && _lastTotalDiffCount > 0;
+
+    public bool CanCompareFiles => HasBothFiles && !IsComparing;
+
+    public bool CanExportResults => CurrentUiState == CompareUiState.Completed && HasComparisonResult;
 
     public ICommand OpenFileACommand { get; }
     public ICommand OpenFileBCommand { get; }
@@ -125,18 +200,16 @@ public class MainViewModel : INotifyPropertyChanged
 
     public MainViewModel()
     {
-        OpenFileACommand = new RelayCommand(_ => OpenFile(isFileA: true));
-        OpenFileBCommand = new RelayCommand(_ => OpenFile(isFileA: false));
-        CompareCommand = new RelayCommand(
-            async _ => await CompareAsync(),
-            _ => !string.IsNullOrEmpty(FileAPath) && !string.IsNullOrEmpty(FileBPath) && !_isComparing);
-        CancelCommand = new RelayCommand(
-            _ => _cts?.Cancel(),
-            _ => _isComparing);
-        ExportCsvCommand = new RelayCommand(
-            async _ => await ExportCsvAsync(),
-            _ => _lastDisplayDiffItems.Count > 0 && !_isComparing);
+        OpenFileACommand = new RelayCommand(_ => OpenFile(isFileA: true), _ => IsFileSelectionEnabled);
+        OpenFileBCommand = new RelayCommand(_ => OpenFile(isFileA: false), _ => IsFileSelectionEnabled);
+        CompareCommand = new RelayCommand(async _ => await CompareAsync(), _ => CanCompareFiles);
+        CancelCommand = new RelayCommand(_ => _cts?.Cancel(), _ => IsComparing);
+        ExportCsvCommand = new RelayCommand(async _ => await ExportCsvAsync(), _ => CanExportResults);
+
+        UpdateProgress(0, 0);
     }
+
+    private bool HasBothFiles => !string.IsNullOrWhiteSpace(FileAPath) && !string.IsNullOrWhiteSpace(FileBPath);
 
     private void OpenFile(bool isFileA)
     {
@@ -144,18 +217,21 @@ public class MainViewModel : INotifyPropertyChanged
         if (dialog.ShowDialog() != true) return;
 
         var path = dialog.FileName;
-        var sizeText = BinaryFileService.FormatFileSize(_fileService.GetFileSize(path));
+        var sizeBytes = _fileService.GetFileSize(path);
+        var sizeText = BinaryFileService.FormatFileSize(sizeBytes);
         var bytes = _fileService.ReadBytes(path);
 
         if (isFileA)
         {
             _bytesA = bytes;
+            _fileASizeBytes = sizeBytes;
             FileAPath = path;
             FileASize = sizeText;
         }
         else
         {
             _bytesB = bytes;
+            _fileBSizeBytes = sizeBytes;
             FileBPath = path;
             FileBSize = sizeText;
         }
@@ -166,68 +242,30 @@ public class MainViewModel : INotifyPropertyChanged
 
     private async Task CompareAsync()
     {
-        _isComparing = true;
         _cts = new CancellationTokenSource();
-        CommandManager.InvalidateRequerySuggested();
 
-        CompareStatus = "比較中...";
-        DiffCountText = "-";
-        FirstDiffOffsetText = "-";
-        SameSizeText = "-";
-        SelectedDiffOffsetText = "-";
-        Progress = 0;
-        DiffItems = [];
-        _lastDisplayDiffItems = [];
+        PrepareForComparison();
 
         try
         {
-            var progress = new Progress<double>(p => Progress = p);
+            var progress = new Progress<BinaryCompareProgress>(UpdateProgress);
             var result = await _compareService.CompareAsync(
                 FileAPath, FileBPath, progress, _cts.Token);
 
-            CompareStatus = result.AreIdentical
-                ? "2つのファイルは完全に一致しています"
-                : "差分あり";
-            DiffCountText = $"{result.TotalDiffCount:N0} 件";
-            FirstDiffOffsetText = result.FirstDiffOffset.HasValue
-                ? $"0x{result.FirstDiffOffset.Value:X8}"
-                : "なし";
-            SameSizeText = result.IsSameSize ? "同じ" : "異なる";
-
-            FileAHexContent = HexFormatter.GenerateDiffHexView(_bytesA, result.DisplayDiffItems, isFileA: true);
-            FileBHexContent = HexFormatter.GenerateDiffHexView(_bytesB, result.DisplayDiffItems, isFileA: false);
-
-            _lastDisplayDiffItems = result.DisplayDiffItems;
-            DiffItems = result.DisplayDiffItems
-                .Select(d => new DiffItemViewModel(d))
-                .ToList();
+            ApplyCompareResult(result);
         }
         catch (OperationCanceledException)
         {
-            CompareStatus = "比較をキャンセルしました";
-            DiffCountText = "-";
-            FirstDiffOffsetText = "-";
-            SameSizeText = "-";
-            SelectedDiffOffsetText = "-";
-            DiffItems = [];
-            _lastDisplayDiffItems = [];
+            ApplyCanceledState();
         }
         catch (Exception ex)
         {
-            CompareStatus = $"エラー: {ex.Message}";
-            DiffCountText = "-";
-            FirstDiffOffsetText = "-";
-            SameSizeText = "-";
-            SelectedDiffOffsetText = "-";
-            DiffItems = [];
-            _lastDisplayDiffItems = [];
+            ApplyErrorState(ex.Message);
         }
         finally
         {
-            Progress = 0;
             _cts?.Dispose();
             _cts = null;
-            _isComparing = false;
             CommandManager.InvalidateRequerySuggested();
         }
     }
@@ -246,26 +284,117 @@ public class MainViewModel : INotifyPropertyChanged
         try
         {
             await _exportService.ExportToCsvAsync(dialog.FileName, _lastDisplayDiffItems);
-            CompareStatus = "CSV出力が完了しました";
         }
         catch (Exception ex)
         {
-            CompareStatus = $"CSV出力エラー: {ex.Message}";
+            MessageBox.Show(
+                $"CSV出力に失敗しました: {ex.Message}",
+                "BinaryDiffViewer",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
+    }
+
+    private void PrepareForComparison()
+    {
+        ClearComparisonDetails();
+        ResetHexPreview();
+        UpdateProgress(0, Math.Max(_fileASizeBytes, _fileBSizeBytes));
+        CompareStatus = "比較中...";
+        CurrentUiState = CompareUiState.Comparing;
+    }
+
+    private void ApplyCompareResult(BinaryDiffResult result)
+    {
+        _hasComparisonResult = true;
+        _lastTotalDiffCount = result.TotalDiffCount;
+        NotifyComparisonStateChanged();
+
+        CompareStatus = result.AreIdentical ? "一致" : "差分あり";
+        DiffCountText = $"{result.TotalDiffCount:N0} 件";
+        FirstDiffOffsetText = result.FirstDiffOffset.HasValue
+            ? $"0x{result.FirstDiffOffset.Value:X8}"
+            : "なし";
+        SameSizeText = result.IsSameSize ? "同じ" : "異なる";
+
+        FileAHexContent = HexFormatter.GenerateDiffHexView(_bytesA, result.DisplayDiffItems, isFileA: true);
+        FileBHexContent = HexFormatter.GenerateDiffHexView(_bytesB, result.DisplayDiffItems, isFileA: false);
+
+        _lastDisplayDiffItems = result.DisplayDiffItems;
+        DiffItems = result.DisplayDiffItems
+            .Select(d => new DiffItemViewModel(d))
+            .ToList();
+
+        var totalBytes = Math.Max(result.FileASize, result.FileBSize);
+        UpdateProgress(totalBytes, totalBytes);
+        CurrentUiState = CompareUiState.Completed;
+    }
+
+    private void ApplyCanceledState()
+    {
+        ClearComparisonDetails();
+        ResetHexPreview();
+        CompareStatus = "キャンセルしました";
+        CurrentUiState = CompareUiState.Canceled;
+    }
+
+    private void ApplyErrorState(string message)
+    {
+        ClearComparisonDetails();
+        ResetHexPreview();
+        CompareStatus = $"エラー: {message}";
+        CurrentUiState = CompareUiState.Error;
     }
 
     private void ResetCompareResult()
     {
-        CompareStatus = "未比較";
+        ClearComparisonDetails();
+        ResetHexPreview();
+        UpdateProgress(0, Math.Max(_fileASizeBytes, _fileBSizeBytes));
+        CurrentUiState = HasBothFiles ? CompareUiState.Ready : CompareUiState.Idle;
+        CompareStatus = CurrentUiState == CompareUiState.Ready ? "比較可能" : "未比較";
+    }
+
+    private void ClearComparisonDetails()
+    {
+        _hasComparisonResult = false;
+        _lastTotalDiffCount = 0;
+        NotifyComparisonStateChanged();
+
         DiffCountText = "-";
         FirstDiffOffsetText = "-";
         SameSizeText = "-";
         SelectedDiffOffsetText = "-";
-        Progress = 0;
-        FileAHexContent = HexFormatter.GeneratePlainHexView(_bytesA);
-        FileBHexContent = HexFormatter.GeneratePlainHexView(_bytesB);
         DiffItems = [];
         _lastDisplayDiffItems = [];
+    }
+
+    private void ResetHexPreview()
+    {
+        FileAHexContent = HexFormatter.GeneratePlainHexView(_bytesA);
+        FileBHexContent = HexFormatter.GeneratePlainHexView(_bytesB);
+    }
+
+    private void UpdateProgress(BinaryCompareProgress progress)
+    {
+        UpdateProgress(progress.ProcessedBytes, progress.TotalBytes);
+    }
+
+    private void UpdateProgress(long processedBytes, long totalBytes)
+    {
+        ProcessedMegaBytes = processedBytes / BytesPerMegabyte;
+        TotalMegaBytes = totalBytes / BytesPerMegabyte;
+        ProgressPercentage = totalBytes > 0
+            ? Math.Min(100.0, processedBytes * 100.0 / totalBytes)
+            : 0;
+        ProgressText = $"{ProcessedMegaBytes:F1} MB / {TotalMegaBytes:F1} MB ({ProgressPercentage:F1}%)";
+    }
+
+    private void NotifyComparisonStateChanged()
+    {
+        OnPropertyChanged(nameof(HasComparisonResult));
+        OnPropertyChanged(nameof(HasDifferences));
+        OnPropertyChanged(nameof(CanExportResults));
     }
 
     public void SetSelectedDiffOffset(long? offset)
@@ -279,7 +408,7 @@ public class MainViewModel : INotifyPropertyChanged
     {
         SetSelectedDiffOffset(offset);
 
-        if (string.IsNullOrEmpty(FileAPath) || string.IsNullOrEmpty(FileBPath))
+        if (!HasBothFiles)
             return 0;
 
         var selectedLineIndex = offset / BytesPerHexLine;
